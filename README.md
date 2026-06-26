@@ -60,38 +60,53 @@ npm run dev
    - Use Slash Commands
 7. Open the generated URL and invite the bot to your server.
 
-## Laravel Cloud Deployment
+## Railway Deployment
 
-This bot is a persistent Discord Gateway worker. It should run as a custom background process, not as a Laravel queue worker.
+This bot is a persistent Discord Gateway worker. It does not expose an HTTP server, so do not generate a public Railway domain for it.
 
 1. Push this repository to GitHub.
-2. Create a Laravel Cloud project from the repository.
-3. Add and attach a managed MySQL database to the environment.
-4. Set Node version to Node 22 or Node 24.
-5. Add the Discord environment variables.
-6. Set:
+2. Create a Railway project from the GitHub repository.
+3. Add a Railway MySQL database service to the project.
+4. Set these variables on the bot service:
 
 ```env
+DISCORD_TOKEN=
+DISCORD_CLIENT_ID=
+DISCORD_GUILD_ID=
+SUPPORT_ROLE_ID=
+TICKET_CATEGORY_ID=
+TICKET_LOG_CHANNEL_ID=
 DATABASE_CLIENT=mysql
+MYSQL_URL=${{MySQL.MYSQL_URL}}
+DELETE_TICKET_ON_CLOSE=true
+RAILPACK_NODE_VERSION=22
 ```
 
-7. Use Laravel Cloud's injected `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`, or set `DATABASE_URL`.
-8. Do not use SQLite in production because Laravel Cloud filesystems are ephemeral.
-9. Add one Worker cluster custom background process:
+If Railway does not offer `MYSQL_URL` in the variable autocomplete, set these instead:
+
+```env
+MYSQLHOST=${{MySQL.MYSQLHOST}}
+MYSQLPORT=${{MySQL.MYSQLPORT}}
+MYSQLDATABASE=${{MySQL.MYSQLDATABASE}}
+MYSQLUSER=${{MySQL.MYSQLUSER}}
+MYSQLPASSWORD=${{MySQL.MYSQLPASSWORD}}
+```
+
+5. Set the bot service Start Command:
 
 ```bash
 npm run start
 ```
 
-10. Keep the worker at one process/replica for v1 to avoid duplicate Discord Gateway sessions.
-11. Run one-time commands after deployment:
+6. Set the bot service Pre-deploy Command:
 
 ```bash
 npm run db:migrate
-npm run deploy:commands
 ```
 
-12. Confirm the bot is online, then run `/setup-tickets`.
+7. Keep the bot service at one replica for v1 to avoid duplicate Discord Gateway sessions.
+8. Register slash commands once from your local machine with `npm run deploy:commands`.
+9. Confirm the bot is online, then run `/setup-tickets`.
 
 ## Commands
 

@@ -25,6 +25,18 @@ function required(env, key, errors) {
   return value;
 }
 
+function requiredAny(env, keys, errors) {
+  for (const key of keys) {
+    const value = valueFor(env, key);
+    if (value) {
+      return value;
+    }
+  }
+
+  errors.push(`${keys.join(" or ")} is required`);
+  return "";
+}
+
 function optional(env, key) {
   return valueFor(env, key) || null;
 }
@@ -66,7 +78,12 @@ function inferDatabaseClient(env) {
     return configured;
   }
 
-  return valueFor(env, "DATABASE_URL") || valueFor(env, "DB_HOST") ? "mysql" : "sqlite";
+  return valueFor(env, "DATABASE_URL") ||
+    valueFor(env, "MYSQL_URL") ||
+    valueFor(env, "DB_HOST") ||
+    valueFor(env, "MYSQLHOST")
+    ? "mysql"
+    : "sqlite";
 }
 
 function loadDatabaseConfig(env, errors) {
@@ -77,15 +94,15 @@ function loadDatabaseConfig(env, errors) {
   }
 
   if (client === "mysql") {
-    const databaseUrl = optional(env, "DATABASE_URL");
+    const databaseUrl = optional(env, "DATABASE_URL") ?? optional(env, "MYSQL_URL");
     const connection = databaseUrl
       ? { url: databaseUrl }
       : {
-          host: required(env, "DB_HOST", errors),
-          port: parsePort(valueFor(env, "DB_PORT"), errors),
-          database: required(env, "DB_DATABASE", errors),
-          user: required(env, "DB_USERNAME", errors),
-          password: required(env, "DB_PASSWORD", errors),
+          host: requiredAny(env, ["DB_HOST", "MYSQLHOST"], errors),
+          port: parsePort(valueFor(env, "DB_PORT") || valueFor(env, "MYSQLPORT"), errors),
+          database: requiredAny(env, ["DB_DATABASE", "MYSQLDATABASE"], errors),
+          user: requiredAny(env, ["DB_USERNAME", "MYSQLUSER"], errors),
+          password: requiredAny(env, ["DB_PASSWORD", "MYSQLPASSWORD"], errors),
         };
 
     return {

@@ -9,6 +9,12 @@ import {
 import { TICKET_OPEN_BUTTON_ID } from "../constants.js";
 import { canSetupTickets } from "../services/permission-service.js";
 
+const PANEL_CHANNEL_PERMISSIONS = [
+  [PermissionFlagsBits.ViewChannel, "View Channel"],
+  [PermissionFlagsBits.SendMessages, "Send Messages"],
+  [PermissionFlagsBits.EmbedLinks, "Embed Links"],
+];
+
 export const setupTicketsCommand = new SlashCommandBuilder()
   .setName("setup-tickets")
   .setDescription("Post the support ticket panel in this channel.")
@@ -32,6 +38,31 @@ export async function handleSetupTicketsCommand(interaction) {
     return;
   }
 
+  if (!interaction.channel?.isTextBased?.()) {
+    await interaction.reply({
+      content: "Run this command in the text channel where you want the ticket panel posted.",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const botMember = interaction.guild.members.me ?? (await interaction.guild.members.fetchMe());
+  const channelPermissions = interaction.channel.permissionsFor(botMember);
+  const missingPermissions = PANEL_CHANNEL_PERMISSIONS.filter(([permission]) => !channelPermissions?.has(permission)).map(
+    ([, label]) => label,
+  );
+
+  if (missingPermissions.length > 0) {
+    await interaction.editReply(
+      `I cannot post the ticket panel in this channel yet. Give my bot role these channel permissions: ${missingPermissions.join(
+        ", ",
+      )}.`,
+    );
+    return;
+  }
+
   const embed = new EmbedBuilder()
     .setTitle("Support Tickets")
     .setDescription("Need help from the Ticker Tactix team? Open a private support ticket and describe what you need help with.")
@@ -49,8 +80,5 @@ export async function handleSetupTicketsCommand(interaction) {
     components: [row],
   });
 
-  await interaction.reply({
-    content: "Ticket panel posted.",
-    ephemeral: true,
-  });
+  await interaction.editReply("Ticket panel posted.");
 }

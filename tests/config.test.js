@@ -38,6 +38,41 @@ describe("loadConfig", () => {
     });
   });
 
+  it("loads mysql config from Railway MySQL variables", () => {
+    const config = loadConfig({
+      discord: false,
+      env: {
+        DATABASE_CLIENT: "mysql",
+        MYSQLHOST: "mysql.railway.internal",
+        MYSQLPORT: "3306",
+        MYSQLDATABASE: "railway",
+        MYSQLUSER: "root",
+        MYSQLPASSWORD: "secret",
+      },
+    });
+
+    expect(config.database.connection).toMatchObject({
+      host: "mysql.railway.internal",
+      database: "railway",
+      user: "root",
+      password: "secret",
+    });
+  });
+
+  it("loads mysql config from Railway MYSQL_URL", () => {
+    const config = loadConfig({
+      discord: false,
+      env: {
+        DATABASE_CLIENT: "mysql",
+        MYSQL_URL: "mysql://root:secret@mysql.railway.internal:3306/railway",
+      },
+    });
+
+    expect(config.database.connection).toEqual({
+      url: "mysql://root:secret@mysql.railway.internal:3306/railway",
+    });
+  });
+
   it("requires runtime Discord values", () => {
     expect(() => loadConfig({ discord: "runtime", env: { DATABASE_CLIENT: "sqlite" } })).toThrow(ConfigError);
   });
