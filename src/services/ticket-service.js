@@ -42,6 +42,10 @@ export class TicketService {
       .first();
   }
 
+  async findByChannel(channelId) {
+    return this.db("tickets").where({ channel_id: channelId }).first();
+  }
+
   async reserveOpenTicket({ guildId, userId, reason, interactionId }) {
     const openDedupeKey = buildOpenDedupeKey(guildId, userId);
     const pendingChannelId = `pending:${interactionId}`;
@@ -92,6 +96,45 @@ export class TicketService {
     return {
       ...ticket,
       status: "closed",
+      closed_at: closedAt.toISOString(),
+      closed_by: closedBy,
+      open_dedupe_key: null,
+    };
+  }
+
+  async recordRecoveredClosedTicket({ guildId, channelId, userId, reason, createdAt, closedBy }) {
+    const existing = await this.findByChannel(channelId);
+    if (existing) {
+      return existing;
+    }
+
+    const closedAt = new Date();
+
+    try {
+      await this.db("tickets").insert({
+        guild_id: guildId,
+        channel_id: channelId,
+        user_id: userId,
+        status: "closed",
+        reason,
+        created_at: createdAt ?? closedAt,
+        closed_at: closedAt,
+        closed_by: closedBy,
+        open_dedupe_key: null,
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    }
+
+    return {
+      guild_id: guildId,
+      channel_id: channelId,
+      user_id: userId,
+      status: "closed",
+      reason,
+      created_at: createdAt?.toISOString?.() ?? closedAt.toISOString(),
       closed_at: closedAt.toISOString(),
       closed_by: closedBy,
       open_dedupe_key: null,

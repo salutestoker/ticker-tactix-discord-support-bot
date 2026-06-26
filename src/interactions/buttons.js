@@ -15,6 +15,37 @@ import {
 } from "../constants.js";
 import { canCloseTicket } from "../services/permission-service.js";
 
+function openerIdFromChannelTopic(topic) {
+  const match = topic?.match(/\((\d{17,22})\)/);
+  return match?.[1] ?? null;
+}
+
+async function closeOrRecoverTicket(interaction, context) {
+  const ticket = await context.ticketService.closeTicket(interaction.channelId, interaction.user.id);
+  if (ticket) {
+    return ticket;
+  }
+
+  const existingTicket = await context.ticketService.findByChannel(interaction.channelId);
+  if (existingTicket) {
+    return existingTicket.status === "closed" ? existingTicket : null;
+  }
+
+  const openerId = openerIdFromChannelTopic(interaction.channel?.topic);
+  if (!openerId) {
+    return null;
+  }
+
+  return context.ticketService.recordRecoveredClosedTicket({
+    guildId: interaction.guildId,
+    channelId: interaction.channelId,
+    userId: openerId,
+    reason: "Recovered from ticket channel metadata because the original database record was missing.",
+    createdAt: interaction.channel?.createdAt,
+    closedBy: interaction.user.id,
+  });
+}
+
 export function closeTicketButtonRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -64,9 +95,16 @@ async function handleCloseTicketButton(interaction, context) {
 
   await interaction.deferReply({ ephemeral: true });
 
-  const ticket = await context.ticketService.closeTicket(interaction.channelId, interaction.user.id);
+  const ticket = await closeOrRecoverTicket(interaction, context);
   if (!ticket) {
-    await interaction.editReply("I could not find an open ticket record for this channel.");
+    await interaction.editReply(
+      "I could not find a ticket record for this channel. This usually means the ticket was created before the current production database was connected.",
+    );
+    return;
+  }
+
+  if (ticket.status === "closed" && ticket.closed_by !== interaction.user.id) {
+    await interaction.editReply("This ticket is already closed.");
     return;
   }
 
